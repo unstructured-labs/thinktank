@@ -50,7 +50,7 @@ export const StageCard = ({
 
   return (
     <div
-      className={`rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm transition dark:border-zinc-700/60 dark:bg-zinc-950/70 ${
+      className={`rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm transition dark:border-zinc-700/40 dark:bg-zinc-950/70 ${
         isDisabled ? 'opacity-60 grayscale' : ''
       }`}
     >
@@ -60,13 +60,13 @@ export const StageCard = ({
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{stage.label}</h3>
             {status && (
               <span
-                className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${statusStyles[status]}`}
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.05em] ${statusStyles[status]}`}
               >
                 {status}
               </span>
             )}
           </div>
-          <p className="mt-1 text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400">
             {stage.id}
           </p>
         </div>
@@ -83,11 +83,8 @@ export const StageCard = ({
 
       <div className="mt-4 grid gap-4">
         {stageResults && stageResults.length > 0 && (
-          <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
-              Model statuses
-            </p>
-            <div className="mt-3 grid gap-2">
+          <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-zinc-800/60 dark:bg-zinc-900/60 dark:text-zinc-300">
+            <div className="grid gap-2">
               {stageResults.map((result) => (
                 <div key={result.id} className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium text-slate-900 dark:text-white">
@@ -98,7 +95,7 @@ export const StageCard = ({
                       {result.response?.cost != null ? `$${result.response.cost.toFixed(4)}` : '—'}
                     </span>
                     <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${statusStyles[result.status]}`}
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.05em] ${statusStyles[result.status]}`}
                     >
                       {statusLabel(result.status)}
                     </span>
@@ -120,9 +117,9 @@ export const StageCard = ({
         <div className="grid gap-2">
           <label
             htmlFor={promptId}
-            className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400"
+            className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400"
           >
-            System prompt
+            Prompt Instructions
           </label>
           <Textarea
             id={promptId}

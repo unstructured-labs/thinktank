@@ -14,10 +14,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@thinktank/ui-library/components/sheet'
-import { Toaster } from '@thinktank/ui-library/components/sonner'
+import { Toaster, toast } from '@thinktank/ui-library/components/sonner'
 import { Switch } from '@thinktank/ui-library/components/switch'
 import { OPENROUTER_MODELS } from '@thinktank/utils/openrouter-models'
-import { Loader2, Moon, Play, RotateCcw, Sun } from 'lucide-react'
+import { Loader2, Moon, Pencil, Play, RotateCcw, Sun } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Markdown } from './components/Markdown'
 import { ProblemInput } from './components/ProblemInput'
@@ -99,6 +99,12 @@ const isMultiAgentStage = (stageId: string) => stageId === 'planning' || stageId
 const getRequestCount = (enabledStages: StageConfig[], agentCount: number) =>
   enabledStages.reduce((count, stage) => count + (isMultiAgentStage(stage.id) ? agentCount : 1), 0)
 
+const formatApiKey = (value: string) => {
+  const trimmed = value.trim()
+  if (trimmed.length <= 8) return trimmed
+  return `${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`
+}
+
 const normalizeStoredState = (state: StoredState | null): StoredState | null => {
   if (!state) return null
 
@@ -157,6 +163,9 @@ export default function App() {
   const [runElapsedMs, setRunElapsedMs] = useState(0)
   const [selectedResult, setSelectedResult] = useState<StageResult | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetViewAsText, setSheetViewAsText] = useState(false)
+  const [historySheetOpen, setHistorySheetOpen] = useState(false)
+  const [isEditingApiKey, setIsEditingApiKey] = useState(() => !stored?.apiKey?.trim())
   const [theme, setTheme] = useState<'light' | 'dark'>(stored?.theme ?? 'light')
   const [newModelId, setNewModelId] = useState('')
   const [newPresetId, setNewPresetId] = useState(MODEL_OPTIONS[0]?.id ?? 'custom')
@@ -170,6 +179,7 @@ export default function App() {
     () => runs.find((run) => run.id === selectedRunId) ?? runs[0],
     [runs, selectedRunId],
   )
+  const hasApiKey = Boolean(apiKey.trim())
   const isViewingComplete =
     selectedRun?.final?.status === 'complete' ||
     (selectedRun?.stages.length
@@ -580,8 +590,8 @@ export default function App() {
         <Toaster />
         <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-500 dark:text-zinc-400">
-              LLM THINKTANK
+            <p className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400">
+              LLM THINKTANK 🤔
             </p>
             <h1 className="font-display mt-3 text-4xl text-slate-900 dark:text-white">
               Multi-model workflow for hard problems
@@ -594,24 +604,41 @@ export default function App() {
           <div className="flex flex-col gap-1">
             <label
               htmlFor="openrouter-api-key"
-              className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-zinc-400"
+              className="text-[11px] font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400"
             >
               OpenRouter API key
             </label>
             <div className="flex flex-wrap items-center gap-3">
-              <Input
-                id="openrouter-api-key"
-                type="password"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                placeholder="OpenRouter API key"
-                className="w-64 bg-white/90 dark:bg-zinc-900"
-              />
+              {hasApiKey && !isEditingApiKey ? (
+                <div className="flex min-w-[150px] items-center justify-between gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900 dark:text-zinc-100">
+                  <span className="font-mono">{formatApiKey(apiKey)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingApiKey(true)}
+                    className="rounded-full p-1 text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-100"
+                    aria-label="Edit OpenRouter API key"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <Input
+                  id="openrouter-api-key"
+                  type="text"
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                  onBlur={() => {
+                    setIsEditingApiKey(false)
+                  }}
+                  placeholder="OpenRouter API key"
+                  className="w-64 bg-white/90 dark:bg-zinc-900"
+                />
+              )}
               <button
                 type="button"
                 onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                 aria-label="Toggle theme"
-                className="flex items-center rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                className="flex items-center rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.05em] text-slate-700 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-900 dark:text-zinc-100"
               >
                 {theme === 'light' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
@@ -627,14 +654,14 @@ export default function App() {
         />
 
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-950/70">
+          <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-zinc-700/40 dark:bg-zinc-950/70">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+                <p className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400">
                   Select Models
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                  Configure model pool
+                  Model Pool
                 </h2>
               </div>
               <span className="text-xs text-slate-500 dark:text-zinc-400">
@@ -645,7 +672,7 @@ export default function App() {
               {agentModelIds.map((modelId, index) => (
                 <div
                   key={modelId}
-                  className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-zinc-700"
+                  className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-zinc-700/60"
                 >
                   <Input
                     value={modelId}
@@ -657,7 +684,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => handleAgentRemove(index)}
-                    className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 hover:border-slate-300 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500"
+                    className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 hover:border-slate-300 dark:border-zinc-700/60 dark:text-zinc-400 dark:hover:border-zinc-600"
                     disabled={isRunning}
                   >
                     Remove
@@ -670,8 +697,8 @@ export default function App() {
                 Select at least one agent to run the pipeline.
               </p>
             )}
-            <div className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-4 dark:border-zinc-700">
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+            <div className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-4 dark:border-zinc-700/50">
+              <p className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400">
                 Add OpenRouter Model
               </p>
               <div className="mt-3 grid gap-3">
@@ -710,12 +737,12 @@ export default function App() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-950/70">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+          <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-zinc-700/40 dark:bg-zinc-950/70">
+            <p className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400">
               Synthesis + review
             </p>
             <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-              Select synthesis + review models
+              Synthesis Models
             </h2>
             <p className="mt-2 text-sm text-slate-600 dark:text-zinc-300">
               Choose the single model that merges all planning + solution outputs.
@@ -723,7 +750,7 @@ export default function App() {
             <div className="mt-4 grid gap-3">
               <label
                 htmlFor="synthesis-model"
-                className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400"
+                className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400"
               >
                 Select Synthesis Model
               </label>
@@ -748,7 +775,7 @@ export default function App() {
               </Select>
               <label
                 htmlFor="review-model"
-                className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400"
+                className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400"
               >
                 Select Final Review Model
               </label>
@@ -774,7 +801,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-950/70">
+        <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-sm dark:border-zinc-700/40 dark:bg-zinc-950/70">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-sm text-slate-600 dark:text-zinc-300">
@@ -832,7 +859,7 @@ export default function App() {
             </div>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-zinc-300">
-            <span className="font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-zinc-400">
+            <span className="font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400">
               Request retries
             </span>
             <Switch
@@ -858,11 +885,11 @@ export default function App() {
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+              <p className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400">
                 Pipeline stages
               </p>
               <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                Configure the workflow
+                Workflow Stages
               </h2>
             </div>
             {stages.map((stage) => {
@@ -893,21 +920,18 @@ export default function App() {
           </div>
 
           <div className="space-y-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400">
                 Outputs
               </p>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                Results + history
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Results</h2>
+                <Button size="sm" variant="secondary" onClick={() => setHistorySheetOpen(true)}>
+                  View History
+                </Button>
+              </div>
             </div>
             <ResultsPanel run={selectedRun} />
-            <RunHistory
-              runs={runs}
-              selectedRunId={selectedRun?.id}
-              onSelect={setSelectedRunId}
-              onClear={handleClearHistory}
-            />
           </div>
         </div>
         <Sheet
@@ -916,6 +940,7 @@ export default function App() {
             setSheetOpen(open)
             if (!open) {
               setSelectedResult(null)
+              setSheetViewAsText(false)
             }
           }}
         >
@@ -962,23 +987,56 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      if (selectedResult?.output) {
+                        navigator.clipboard.writeText(selectedResult.output)
+                        toast.success('Response copied')
+                      }
+                    }}
+                  >
+                    Copy Response
+                  </Button>
+                  <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-zinc-300">
+                    <span>{sheetViewAsText ? 'View as Markdown' : 'View as Text'}</span>
+                    <label className="sr-only" htmlFor="stage-view-toggle">
+                      Toggle response view
+                    </label>
+                    <Switch
+                      id="stage-view-toggle"
+                      checked={sheetViewAsText}
+                      onCheckedChange={setSheetViewAsText}
+                      aria-label="Toggle response view"
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 dark:border-zinc-800/60 dark:bg-zinc-900/60">
                   {selectedResult.error ? (
                     <p className="text-sm text-rose-600 dark:text-rose-400">
                       {selectedResult.error}
                     </p>
                   ) : selectedResult.output ? (
-                    <Markdown
-                      content={selectedResult.output}
-                      className="text-sm text-slate-800 dark:text-zinc-100"
-                    />
+                    sheetViewAsText ? (
+                      <div className="whitespace-pre-wrap text-sm text-slate-800 dark:text-zinc-100">
+                        {selectedResult.output}
+                      </div>
+                    ) : (
+                      <Markdown
+                        content={selectedResult.output}
+                        className="text-sm text-slate-800 dark:text-zinc-100"
+                      />
+                    )
                   ) : (
                     <p className="text-sm text-slate-500 dark:text-zinc-400">No output yet.</p>
                   )}
                 </div>
 
                 <div className="grid gap-4">
-                  <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/60">
+                  <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/60">
                     <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
                       Request payload
                     </summary>
@@ -986,7 +1044,7 @@ export default function App() {
                       {JSON.stringify(selectedResult.request, null, 2)}
                     </pre>
                   </details>
-                  <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/60">
+                  <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/60">
                     <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
                       Response metadata
                     </summary>
@@ -999,6 +1057,48 @@ export default function App() {
             )}
           </SheetContent>
         </Sheet>
+        <Sheet open={historySheetOpen} onOpenChange={setHistorySheetOpen}>
+          <SheetContent>
+            <div className="space-y-6">
+              <SheetHeader>
+                <SheetTitle>Run history</SheetTitle>
+                <SheetDescription className="text-slate-600 dark:text-zinc-300">
+                  Select a previous run to load it in the main view.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600 dark:text-zinc-300">
+                <span>All data is stored locally in the browser.</span>
+                <Button size="sm" variant="secondary" onClick={handleClearHistory}>
+                  Clear all
+                </Button>
+              </div>
+              <RunHistory
+                runs={runs}
+                selectedRunId={selectedRun?.id}
+                onSelect={(runId) => {
+                  setSelectedRunId(runId)
+                  setHistorySheetOpen(false)
+                }}
+                onClear={handleClearHistory}
+                showClear={false}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+        <footer className="mt-10 text-sm text-slate-500 dark:text-zinc-400">
+          <div className="ml-[calc(50%-50vw)] w-screen border-t border-slate-200/70 dark:border-zinc-700/40" />
+          <div className="pt-6">
+            Built by{' '}
+            <a
+              href="https://unstructured-labs.xyz/"
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-slate-600 hover:text-sky-600 dark:text-zinc-300 dark:hover:text-sky-400"
+            >
+              Unstructured Labs
+            </a>
+          </div>
+        </footer>
       </div>
     </div>
   )

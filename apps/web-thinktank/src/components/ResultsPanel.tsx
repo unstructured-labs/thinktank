@@ -7,12 +7,13 @@ import {
   SheetTitle,
 } from '@thinktank/ui-library/components/sheet'
 import { toast } from '@thinktank/ui-library/components/sonner'
+import { Switch } from '@thinktank/ui-library/components/switch'
 import { useState } from 'react'
 import type { PipelineRun, StageResult } from '../lib/types'
 import { Markdown } from './Markdown'
 
 const statusStyles: Record<NonNullable<StageResult['status']>, string> = {
-  pending: 'border-slate-200 text-slate-500 dark:border-zinc-600 dark:text-zinc-300',
+  pending: 'border-slate-200 text-slate-500 dark:border-zinc-700/60 dark:text-zinc-300',
   running:
     'border-amber-300 text-amber-600 bg-amber-50 animate-pulse dark:border-amber-400 dark:text-amber-300 dark:bg-amber-950/40',
   complete: 'border-emerald-400 text-emerald-700 dark:border-emerald-400 dark:text-emerald-300',
@@ -50,9 +51,10 @@ type ResultsPanelProps = {
 
 export const ResultsPanel = ({ run }: ResultsPanelProps) => {
   const [finalSheetOpen, setFinalSheetOpen] = useState(false)
+  const [finalViewAsText, setFinalViewAsText] = useState(false)
   if (!run) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 p-6 text-sm text-slate-500 dark:border-zinc-700 dark:bg-zinc-950/70 dark:text-zinc-400">
+      <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 p-6 text-sm text-slate-500 dark:border-zinc-700/50 dark:bg-zinc-950/70 dark:text-zinc-400">
         Run the pipeline to see stage outputs, costs, and metadata.
       </div>
     )
@@ -68,19 +70,10 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
 
   return (
     <div className="space-y-4">
-      <details className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-950/70">
-        <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
-          Problem
-        </summary>
-        <div className="mt-3 whitespace-pre-wrap text-sm text-slate-700 dark:text-zinc-200">
-          {run.problem}
-        </div>
-      </details>
-
-      <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-950/70">
+      <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-zinc-700/40 dark:bg-zinc-950/70">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400">
               Response summary data
             </p>
             <h3 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
@@ -101,7 +94,7 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
 
       <details
         open
-        className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-950/70"
+        className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-zinc-700/40 dark:bg-zinc-950/70"
       >
         <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
           Final Response
@@ -115,7 +108,7 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
                 </h3>
               </div>
               <span
-                className={`rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${
+                className={`rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.05em] ${
                   statusStyles[run.final.status]
                 }`}
               >
@@ -138,7 +131,7 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
               </div>
             </div>
 
-            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/80 p-4 dark:border-zinc-800/60 dark:bg-zinc-900/60">
               {run.final.error ? (
                 <p className="text-sm text-rose-600 dark:text-rose-400">{run.final.error}</p>
               ) : run.final.output ? (
@@ -164,7 +157,7 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
               )}
             </div>
 
-            <details className="mt-4 rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/60">
+            <details className="mt-4 rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/60">
               <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
                 Request + response metadata
               </summary>
@@ -196,6 +189,9 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
         open={finalSheetOpen}
         onOpenChange={(open) => {
           setFinalSheetOpen(open)
+          if (!open) {
+            setFinalViewAsText(false)
+          }
         }}
       >
         <SheetContent>
@@ -224,35 +220,55 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
               </div>
 
               <div>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    if (run.final?.output) {
-                      navigator.clipboard.writeText(run.final.output)
-                      toast.success('Response copied')
-                    }
-                  }}
-                >
-                  Copy Full Response
-                </Button>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      if (run.final?.output) {
+                        navigator.clipboard.writeText(run.final.output)
+                        toast.success('Response copied')
+                      }
+                    }}
+                  >
+                    Copy Response
+                  </Button>
+                  <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-zinc-300">
+                    <span>{finalViewAsText ? 'View as Markdown' : 'View as Text'}</span>
+                    <label className="sr-only" htmlFor="final-view-toggle">
+                      Toggle response view
+                    </label>
+                    <Switch
+                      id="final-view-toggle"
+                      checked={finalViewAsText}
+                      onCheckedChange={setFinalViewAsText}
+                      aria-label="Toggle response view"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 dark:border-zinc-800/60 dark:bg-zinc-900/60">
                 {run.final.error ? (
                   <p className="text-sm text-rose-600 dark:text-rose-400">{run.final.error}</p>
                 ) : run.final.output ? (
-                  <Markdown
-                    content={run.final.output}
-                    className="text-sm text-slate-800 dark:text-zinc-100"
-                  />
+                  finalViewAsText ? (
+                    <div className="whitespace-pre-wrap text-sm text-slate-800 dark:text-zinc-100">
+                      {run.final.output}
+                    </div>
+                  ) : (
+                    <Markdown
+                      content={run.final.output}
+                      className="text-sm text-slate-800 dark:text-zinc-100"
+                    />
+                  )
                 ) : (
                   <p className="text-sm text-slate-500 dark:text-zinc-400">No output yet.</p>
                 )}
               </div>
 
               <div className="grid gap-4">
-                <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/60">
+                <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/60">
                   <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
                     Request payload
                   </summary>
@@ -260,7 +276,7 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
                     {JSON.stringify(run.final.request, null, 2)}
                   </pre>
                 </details>
-                <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/60">
+                <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/60">
                   <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
                     Response metadata
                   </summary>

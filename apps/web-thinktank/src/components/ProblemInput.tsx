@@ -9,14 +9,14 @@ type ProblemInputProps = {
 
 export const ProblemInput = ({ value, onChange, onClearData, disabled }: ProblemInputProps) => {
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-5 shadow-sm dark:border-zinc-700/60 dark:bg-zinc-950/70">
+    <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-5 shadow-sm dark:border-zinc-700/40 dark:bg-zinc-950/70">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 dark:text-zinc-400">
             Problem Statement
           </p>
           <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-            Define the challenge
+            Define the Challenge
           </h2>
         </div>
         <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-zinc-400">
@@ -24,7 +24,7 @@ export const ProblemInput = ({ value, onChange, onClearData, disabled }: Problem
           <button
             type="button"
             onClick={onClearData}
-            className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 hover:border-slate-300 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500"
+            className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-slate-500 hover:border-slate-300 dark:border-zinc-700/60 dark:text-zinc-400 dark:hover:border-zinc-600"
           >
             Clear Data
           </button>
