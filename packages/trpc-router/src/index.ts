@@ -1,5 +1,5 @@
+import { db, users } from '@thinktank/db'
 import { initTRPC } from '@trpc/server'
-import { db, users } from '@unstructured/db'
 import { z } from 'zod'
 
 const t = initTRPC.create()

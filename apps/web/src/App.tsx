@@ -1,11 +1,11 @@
-import { Button } from '@unstructured/ui-library/components/button'
+import { Button } from '@thinktank/ui-library/components/button'
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@unstructured/ui-library/components/card'
+} from '@thinktank/ui-library/components/card'
 import { trpc } from './trpc'
 
 function App() {

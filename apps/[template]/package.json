@@ -1,5 +1,5 @@
 {
-  "name": "@unstructured/web-template",
+  "name": "@thinktank/web-template",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,8 +10,8 @@
     "tsc": "tsc --noEmit"
   },
   "dependencies": {
-    "@unstructured/ui-library": "workspace:*",
-    "@unstructured/trpc-router": "workspace:*",
+    "@thinktank/ui-library": "workspace:*",
+    "@thinktank/trpc-router": "workspace:*",
     "@tanstack/react-query": "^5.62.16",
     "@trpc/client": "^11.0.0",
     "@trpc/react-query": "^11.0.0",

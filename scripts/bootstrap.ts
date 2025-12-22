@@ -141,7 +141,9 @@ if (!normalizedName) {
 }
 
 const targetPath = resolveTargetPath(input, normalizedName)
-const confirm = await rl.question(`${normalizedName} will be bootstrapped now. Confirm? (y/n): `)
+const confirm = await rl.question(
+  `Repo location: ${targetPath}\nMonorepo package name: @${normalizedName}\n\nConfirm setup details to continue? (y/n): `,
+)
 rl.close()
 
 if (!confirm.trim().toLowerCase().startsWith('y')) {
@@ -160,7 +162,7 @@ if (await pathExists(targetPath)) {
 }
 
 await copyDir(SOURCE_ROOT, targetPath)
-await replaceScope(targetPath, '@unstructured', `@${normalizedName}`)
+await replaceScope(targetPath, '@thinktank', `@${normalizedName}`)
 await updateRootPackageName(targetPath, normalizedName)
 
 console.log(`Bootstrap complete at ${targetPath}`)

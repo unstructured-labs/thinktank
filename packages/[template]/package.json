@@ -1,5 +1,5 @@
 {
-  "name": "@unstructured/package-template",
+  "name": "@thinktank/package-template",
   "version": "0.0.1",
   "private": true,
   "type": "module",

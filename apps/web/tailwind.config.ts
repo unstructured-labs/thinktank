@@ -1,4 +1,4 @@
-import baseConfig from '@unstructured/ui-library/tailwind.config'
+import baseConfig from '@thinktank/ui-library/tailwind.config'
 import type { Config } from 'tailwindcss'
 
 export default {

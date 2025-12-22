@@ -1,5 +1,5 @@
 {
-  "name": "@unstructured/server",
+  "name": "@thinktank/server",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@unstructured/db": "workspace:*",
-    "@unstructured/trpc-router": "workspace:*",
+    "@thinktank/db": "workspace:*",
+    "@thinktank/trpc-router": "workspace:*",
     "@hono/trpc-server": "^0.3.2",
     "hono": "^4.6.18"
   },

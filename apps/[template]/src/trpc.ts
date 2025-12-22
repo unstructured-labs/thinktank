@@ -1,4 +1,4 @@
+import type { AppRouter } from '@thinktank/trpc-router'
 import { type CreateTRPCReact, createTRPCReact } from '@trpc/react-query'
-import type { AppRouter } from '@unstructured/trpc-router'
 
 export const trpc: CreateTRPCReact<AppRouter, unknown> = createTRPCReact<AppRouter>()

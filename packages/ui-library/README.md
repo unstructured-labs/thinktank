@@ -1,4 +1,4 @@
-# @unstructured/ui-library
+# @thinktank/ui-library
 
 Shared UI component library for LMIQ monorepo using ShadCN and Tailwind CSS.
 
@@ -20,7 +20,7 @@ In your app's `package.json`:
 ```json
 {
   "dependencies": {
-    "@unstructured/ui-library": "workspace:*"
+    "@thinktank/ui-library": "workspace:*"
   }
 }
 ```
@@ -30,7 +30,7 @@ In your app's `package.json`:
 Create `tailwind.config.ts` in your app:
 ```ts
 import type { Config } from 'tailwindcss'
-import baseConfig from '@unstructured/ui-library/tailwind.config'
+import baseConfig from '@thinktank/ui-library/tailwind.config'
 
 export default {
   ...baseConfig,
@@ -75,8 +75,8 @@ Create your app's CSS file (e.g., `index.css`) with Tailwind directives and them
 ### 5. Import Components
 
 ```tsx
-import { Button } from '@unstructured/ui-library/components/button'
-import { Card, CardHeader, CardTitle, CardContent } from '@unstructured/ui-library/components/card'
+import { Button } from '@thinktank/ui-library/components/button'
+import { Card, CardHeader, CardTitle, CardContent } from '@thinktank/ui-library/components/card'
 
 function MyApp() {
   return (
@@ -160,7 +160,7 @@ export { Badge }
 
 Merge Tailwind classes intelligently:
 ```tsx
-import { cn } from '@unstructured/ui-library/lib/utils'
+import { cn } from '@thinktank/ui-library/lib/utils'
 
 <div className={cn('base-class', condition && 'conditional-class', className)} />
 ```
