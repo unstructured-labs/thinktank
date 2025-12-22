@@ -586,9 +586,9 @@ export default function App() {
             <h1 className="font-display mt-3 text-4xl text-slate-900 dark:text-white">
               Multi-model workflow for hard problems
             </h1>
-            <p className="mt-3 max-w-xl text-sm text-slate-600 dark:text-zinc-300">
-              A multi-stage LLM pipeline tool to plan, review, and synthesize robust solutions to
-              hard problems.
+            <p className="mt-3 max-w-2xl text-sm text-slate-600 dark:text-zinc-300">
+              A multi-stage LLM pipeline tool to plan, review, and synthesize solutions to hard
+              problems.
             </p>
           </div>
           <div className="flex flex-col gap-1">
