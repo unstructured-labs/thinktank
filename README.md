@@ -1,53 +1,55 @@
-# Unstructured Starter Repo
+# Thinktank Pipeline
 
-A Bun monorepo starter with a minimal full-stack setup: Hono + tRPC on the server, Vite + React + TanStack Query on the client, and TypeScript project references across shared packages.
+A Bun-powered monorepo for the Thinktank pipeline UI and API, built for running multi-stage LLM workflows (planning, synthesis, and review) across multiple models.
 
 ## Quick Start
 
 ```sh
 bun install
-bun dev
+cp .env.example .env
+bun run env:setup
+bun run dev
 ```
 
-- Server: http://localhost:3000
-- Web: http://localhost:5173
+- API (Hono + tRPC): http://localhost:3000
+- Web (Vite + React): http://localhost:5173
 
-## Structure
+## Repo Layout
 
 ```
 apps/
-  server/        # Hono + tRPC API
-  web/           # Vite + React client
-  [template]/    # App template
+  server/           # Hono + tRPC API
+  web-thinktank/    # Vite + React client
+  [template]/       # App template
 packages/
-  db/            # Drizzle + SQLite
-  trpc-router/   # Shared tRPC router
-  ui-library/    # ShadCN UI primitives
-  [template]/    # Package template
+  db/               # Drizzle + SQLite
+  trpc-router/      # Shared tRPC router
+  ui-library/       # ShadCN UI primitives
+  utils/            # Shared utilities (model lists, helpers)
+  [template]/       # Package template
 tooling/
-  [template]/    # Tooling template
+  [template]/       # Tooling template
 ```
 
 ## Common Commands
 
 ```sh
-bun dev
-bun dev:server
-bun dev:web
-cp .env.example .env
-task env:setup
-bun tsc
-bun lint
-bun format
+bun run dev
+bun run dev:server
+bun run dev:web
+bun run lint
+bun run format
+bun run tsc
+bun run check
 ```
 
 ## Docker
 
-Build from the repo root (so the workspaces resolve):
+Build from the repo root so workspaces resolve:
 
 ```sh
-docker build -f apps/server/Dockerfile -t starter-server .
-docker build -f apps/web-thinktank/Dockerfile -t starter-web .
+docker build -f apps/server/Dockerfile -t thinktank-server .
+docker build -f apps/web-thinktank/Dockerfile -t thinktank-web .
 ```
 
 ## Templates

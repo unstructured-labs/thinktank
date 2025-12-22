@@ -75,6 +75,7 @@ export type StoredState = {
   agentModelIds: string[]
   synthesisModelId: string
   reviewModelId: string
+  finalModelId?: string
   retryEnabled?: boolean
   retryThreshold?: number
   theme?: 'light' | 'dark'

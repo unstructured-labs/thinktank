@@ -14,10 +14,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@thinktank/ui-library/components/sheet'
+import { Toaster } from '@thinktank/ui-library/components/sonner'
 import { Switch } from '@thinktank/ui-library/components/switch'
 import { OPENROUTER_MODELS } from '@thinktank/utils/openrouter-models'
-import { KeyRound, Loader2, Moon, Play, RotateCcw, Sun } from 'lucide-react'
+import { Loader2, Moon, Play, RotateCcw, Sun } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { Markdown } from './components/Markdown'
 import { ProblemInput } from './components/ProblemInput'
 import { ResultsPanel } from './components/ResultsPanel'
 import { RunHistory } from './components/RunHistory'
@@ -394,7 +396,7 @@ export default function App() {
           startTime: new Date(),
         }))
 
-        stageEntries.forEach((entry) => {
+        for (const entry of stageEntries) {
           setRuns((prev) =>
             updateRunStages(prev, runId, entry.stageResultId, (stage) => ({
               ...stage,
@@ -402,7 +404,7 @@ export default function App() {
               startedAt: entry.startTime.toISOString(),
             })),
           )
-        })
+        }
 
         const stageOutputs: string[] = []
 
@@ -575,6 +577,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#f5ede1,_#f7f4ef_45%,_#eef2f7_100%)] text-slate-900 dark:bg-[radial-gradient(circle_at_top,_#1a1a1a,_#0f0f10_45%,_#050505_100%)] dark:text-zinc-100">
       <div className="mx-auto max-w-6xl space-y-6 px-6 py-10">
+        <Toaster />
         <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-500 dark:text-zinc-400">
@@ -588,27 +591,31 @@ export default function App() {
               hard problems.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <KeyRound className="h-4 w-4 text-slate-400 dark:text-zinc-500" />
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="openrouter-api-key"
+              className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-zinc-400"
+            >
+              OpenRouter API key
+            </label>
+            <div className="flex flex-wrap items-center gap-3">
               <Input
                 id="openrouter-api-key"
                 type="password"
                 value={apiKey}
                 onChange={(event) => setApiKey(event.target.value)}
                 placeholder="OpenRouter API key"
-                aria-label="OpenRouter API key"
                 className="w-64 bg-white/90 dark:bg-zinc-900"
               />
+              <button
+                type="button"
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                aria-label="Toggle theme"
+                className="flex items-center rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              >
+                {theme === 'light' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-            >
-              {theme === 'light' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              {theme === 'light' ? 'Light' : 'Dark'}
-            </button>
           </div>
         </header>
 
@@ -637,7 +644,7 @@ export default function App() {
             <div className="mt-4 grid gap-3">
               {agentModelIds.map((modelId, index) => (
                 <div
-                  key={`${modelId}-${index}`}
+                  key={modelId}
                   className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-zinc-700"
                 >
                   <Input
@@ -912,7 +919,7 @@ export default function App() {
             }
           }}
         >
-          <SheetContent className="w-full sm:max-w-2xl">
+          <SheetContent>
             {selectedResult && (
               <div className="space-y-6">
                 <SheetHeader>
@@ -961,31 +968,32 @@ export default function App() {
                       {selectedResult.error}
                     </p>
                   ) : selectedResult.output ? (
-                    <div className="whitespace-pre-wrap text-sm text-slate-800 dark:text-zinc-100">
-                      {selectedResult.output}
-                    </div>
+                    <Markdown
+                      content={selectedResult.output}
+                      className="text-sm text-slate-800 dark:text-zinc-100"
+                    />
                   ) : (
                     <p className="text-sm text-slate-500 dark:text-zinc-400">No output yet.</p>
                   )}
                 </div>
 
                 <div className="grid gap-4">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+                  <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/60">
+                    <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
                       Request payload
-                    </div>
-                    <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
+                    </summary>
+                    <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
                       {JSON.stringify(selectedResult.request, null, 2)}
                     </pre>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+                  </details>
+                  <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/60">
+                    <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
                       Response metadata
-                    </div>
-                    <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
+                    </summary>
+                    <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
                       {JSON.stringify(selectedResult.response, null, 2)}
                     </pre>
-                  </div>
+                  </details>
                 </div>
               </div>
             )}

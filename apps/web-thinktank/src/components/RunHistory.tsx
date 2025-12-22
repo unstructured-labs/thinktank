@@ -43,8 +43,8 @@ export const RunHistory = ({ runs, selectedRunId, onSelect, onClear }: RunHistor
               onClick={() => onSelect(run.id)}
               className={`w-full rounded-xl border px-3 py-3 text-left text-sm transition ${
                 run.id === selectedRunId
-                  ? 'border-slate-900 bg-slate-900 text-white dark:border-zinc-500 dark:bg-zinc-800 dark:text-zinc-100'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-zinc-500'
+                  ? 'border-slate-900 bg-slate-900 text-white dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:border-zinc-600'
               }`}
             >
               <div className="font-semibold">

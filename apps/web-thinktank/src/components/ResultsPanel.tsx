@@ -6,8 +6,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@thinktank/ui-library/components/sheet'
+import { toast } from '@thinktank/ui-library/components/sonner'
 import { useState } from 'react'
 import type { PipelineRun, StageResult } from '../lib/types'
+import { Markdown } from './Markdown'
 
 const statusStyles: Record<NonNullable<StageResult['status']>, string> = {
   pending: 'border-slate-200 text-slate-500 dark:border-zinc-600 dark:text-zinc-300',
@@ -63,11 +65,6 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
     run.stages.some((stage) => stage.response?.usage?.total_tokens != null) ||
     !!run.final?.response?.usage?.total_tokens
   const totalTokens = hasTokens ? getTotalTokens(run) : null
-
-  const openResult = (result: StageResult) => {
-    setSelectedResult(result)
-    setSheetOpen(true)
-  }
 
   return (
     <div className="space-y-4">
@@ -145,15 +142,22 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
               {run.final.error ? (
                 <p className="text-sm text-rose-600 dark:text-rose-400">{run.final.error}</p>
               ) : run.final.output ? (
-                <div>
-                  <div className="line-clamp-5 whitespace-pre-wrap text-sm text-slate-800 dark:text-zinc-100">
-                    {run.final.output}
-                  </div>
-                  <div className="mt-3">
-                    <Button size="sm" variant="secondary" onClick={() => setFinalSheetOpen(true)}>
-                      View Full Response
-                    </Button>
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => setFinalSheetOpen(true)}>
+                    View Full Response
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      if (run.final?.output) {
+                        navigator.clipboard.writeText(run.final.output)
+                        toast.success('Response copied')
+                      }
+                    }}
+                  >
+                    Copy Response
+                  </Button>
                 </div>
               ) : (
                 <p className="text-sm text-slate-500 dark:text-zinc-400">No output yet.</p>
@@ -194,7 +198,7 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
           setFinalSheetOpen(open)
         }}
       >
-        <SheetContent className="w-full sm:max-w-2xl">
+        <SheetContent>
           {run.final && (
             <div className="space-y-6">
               <SheetHeader>
@@ -219,35 +223,51 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
                 </div>
               </div>
 
+              <div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    if (run.final?.output) {
+                      navigator.clipboard.writeText(run.final.output)
+                      toast.success('Response copied')
+                    }
+                  }}
+                >
+                  Copy Full Response
+                </Button>
+              </div>
+
               <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
                 {run.final.error ? (
                   <p className="text-sm text-rose-600 dark:text-rose-400">{run.final.error}</p>
                 ) : run.final.output ? (
-                  <div className="whitespace-pre-wrap text-sm text-slate-800 dark:text-zinc-100">
-                    {run.final.output}
-                  </div>
+                  <Markdown
+                    content={run.final.output}
+                    className="text-sm text-slate-800 dark:text-zinc-100"
+                  />
                 ) : (
                   <p className="text-sm text-slate-500 dark:text-zinc-400">No output yet.</p>
                 )}
               </div>
 
               <div className="grid gap-4">
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+                <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/60">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
                     Request payload
-                  </div>
-                  <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
+                  </summary>
+                  <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
                     {JSON.stringify(run.final.request, null, 2)}
                   </pre>
-                </div>
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-zinc-400">
+                </details>
+                <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/60">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
                     Response metadata
-                  </div>
-                  <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
+                  </summary>
+                  <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
                     {JSON.stringify(run.final.response, null, 2)}
                   </pre>
-                </div>
+                </details>
               </div>
             </div>
           )}
