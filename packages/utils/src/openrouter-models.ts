@@ -182,8 +182,13 @@ export const OPENROUTER_MODELS: OpenRouterModel[] = [
     description: 'Z-AI GLM-4.5 Air model',
   },
   {
-    id: 'deepseek/deepseek-r1-0528',
-    name: 'DeepSeek R1 0528',
-    description: 'DeepSeek R1 0528 model',
+    id: 'deepseek/deepseek-v3.2',
+    name: 'DeepSeek V3.2',
+    description: 'DeepSeek V3.2 model',
+  },
+  {
+    id: 'deepseek/deepseek-v3.2-speciale',
+    name: 'DeepSeek V3.2 Speciale',
+    description: 'DeepSeek V3.2 Speciale model',
   },
 ]
