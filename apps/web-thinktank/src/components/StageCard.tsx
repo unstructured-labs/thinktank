@@ -80,7 +80,7 @@ export const StageCard = ({
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-slate-600 dark:text-zinc-300">
-                      {result.response?.cost != null ? `$${result.response.cost.toFixed(4)}` : '—'}
+                      {result.response?.cost != null ? `$${result.response.cost.toFixed(4)}` : ''}
                     </span>
                     <span
                       className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.05em] ${statusStyles[result.status]}`}

@@ -17,101 +17,38 @@ import {
 import { Toaster, toast } from '@thinktank/ui-library/components/sonner'
 import { Switch } from '@thinktank/ui-library/components/switch'
 import { Textarea } from '@thinktank/ui-library/components/textarea'
-import { OPENROUTER_MODELS } from '@thinktank/utils/openrouter-models'
 import { Loader2, Moon, Pencil, Play, Plus, RotateCcw, Sun, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { Markdown } from './components/Markdown'
+import { useEffect, useState } from 'react'
 import { ProblemInput } from './components/ProblemInput'
+import { ResultDetailSheet } from './components/ResultDetailSheet'
 import { ResultsPanel } from './components/ResultsPanel'
 import { RunHistory } from './components/RunHistory'
 import { StageCard } from './components/StageCard'
 import {
-  AGENT_OPTIONS,
   DEFAULT_AGENT_MODEL_IDS,
   DEFAULT_BASE_URL,
   DEFAULT_REVIEW_MODEL_ID,
-  DEFAULT_STAGES,
   DEFAULT_SYNTHESIS_MODEL_ID,
 } from './data/pipeline'
-import { requestStage } from './lib/openrouter'
-import { clearStoredState, loadStoredState, saveStoredState } from './lib/storage'
-import type {
-  PipelineRun,
-  StageConfig,
-  StageKind,
-  StageResult,
-  StageStatus,
-  StoredState,
-  WorkflowConfig,
-} from './lib/types'
+import { useLocalStorageState } from './hooks/useLocalStorageState'
+import { usePipelineRunner } from './hooks/usePipelineRunner'
+import { useWorkflowState } from './hooks/useWorkflowState'
+import { formatElapsed } from './lib/format'
+import { MODEL_OPTIONS, getAgentLabel } from './lib/models'
+import {
+  cloneDefaultStages,
+  getRequestCount,
+  getStageStatus,
+  isAgentStage,
+  isReviewStage,
+  isSynthesisStage,
+  mergeTemplates,
+} from './lib/pipeline-utils'
+import { clearStoredState } from './lib/storage'
+import type { StageKind, WorkflowConfig } from './lib/types'
 
-const MAX_RUNS = 20
 const DEFAULT_RETRY_THRESHOLD = 3
 const DEFAULT_WORKFLOW_ID = 'default'
-
-const cloneDefaultStages = () => DEFAULT_STAGES.map((stage) => ({ ...stage }))
-const cloneStages = (stages: StageConfig[]) => stages.map((stage) => ({ ...stage }))
-
-const createWorkflowId = () => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return `workflow_${Date.now()}`
-}
-
-const createStageId = () => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return `stage_${Date.now()}`
-}
-
-const slugifyStageId = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-
-const createRunId = () => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return `run_${Date.now()}`
-}
-
-const updateRunStages = (
-  runs: PipelineRun[],
-  runId: string,
-  stageResultId: string,
-  updater: (stage: StageResult) => StageResult,
-) =>
-  runs.map((run) => {
-    if (run.id !== runId) return run
-    return {
-      ...run,
-      stages: run.stages.map((stage) => (stage.id === stageResultId ? updater(stage) : stage)),
-    }
-  })
-
-const updateRunFinal = (
-  runs: PipelineRun[],
-  runId: string,
-  updater: (final: NonNullable<PipelineRun['final']>) => NonNullable<PipelineRun['final']>,
-) =>
-  runs.map((run) => {
-    if (run.id !== runId || !run.final) return run
-    return {
-      ...run,
-      final: updater(run.final),
-    }
-  })
-
-const MODEL_OPTIONS = OPENROUTER_MODELS.map((model) => ({
-  id: model.id,
-  label: model.name,
-  description: model.description,
-}))
 
 const TEMPLATE_WORKFLOWS: WorkflowConfig[] = [
   {
@@ -189,193 +126,132 @@ const TEMPLATE_WORKFLOWS: WorkflowConfig[] = [
   },
 ]
 
-const mergeTemplates = (workflows: WorkflowConfig[]) => {
-  const byId = new Map(workflows.map((workflow) => [workflow.id, workflow]))
-  const mergedTemplates = TEMPLATE_WORKFLOWS.map((template) => byId.get(template.id) ?? template)
-  const extra = workflows.filter(
-    (workflow) => !TEMPLATE_WORKFLOWS.some((template) => template.id === workflow.id),
-  )
-  return [...mergedTemplates, ...extra]
-}
-
-const getAgentLabel = (modelId: string) =>
-  MODEL_OPTIONS.find((option) => option.id === modelId)?.label ??
-  AGENT_OPTIONS.find((option) => option.modelId === modelId)?.label ??
-  modelId
-
-const getStageStatus = (results: StageResult[]): StageStatus | undefined => {
-  if (results.length === 0) return undefined
-  if (results.some((result) => result.status === 'error')) return 'error'
-  if (results.some((result) => result.status === 'running')) return 'running'
-  if (results.every((result) => result.status === 'complete')) return 'complete'
-  return 'pending'
-}
-
-const isAgentStage = (stage: StageConfig) => stage.kind === 'agent'
-const isSynthesisStage = (stage: StageConfig) => stage.kind === 'synthesis'
-const isReviewStage = (stage: StageConfig) => stage.kind === 'review'
-
-const getRequestCount = (enabledStages: StageConfig[], agentCount: number) =>
-  enabledStages.reduce((count, stage) => {
-    if (isReviewStage(stage)) return count
-    return count + (isAgentStage(stage) ? agentCount : 1)
-  }, 0)
-
 const formatApiKey = (value: string) => {
   const trimmed = value.trim()
   if (trimmed.length <= 8) return trimmed
   return `${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`
 }
 
-const getStageKind = (stage: StageConfig): StageKind => {
-  if (stage.kind) return stage.kind
-  if (stage.id === 'synthesis') return 'synthesis'
-  if (stage.id === 'review') return 'review'
-  return 'agent'
-}
-
-const normalizeStageTemperature = (stage: StageConfig) => {
-  if (typeof stage.temperature === 'number') return stage.temperature
-  if (stage.kind === 'synthesis' || stage.id === 'synthesis') return 0.35
-  if (stage.kind === 'review' || stage.id === 'review') return 0.2
-  return 0.4
-}
-
-const normalizeStages = (stages?: StageConfig[]) =>
-  (stages ?? []).map((stage) => ({
-    ...stage,
-    kind: getStageKind(stage),
-    temperature: normalizeStageTemperature(stage),
-  }))
-
-const normalizeStoredState = (state: StoredState | null): StoredState | null => {
-  if (!state) return null
-
-  const normalizedStages = normalizeStages(state.stages)
-  const normalizedRuns =
-    state.runs?.map((run) => ({
-      ...run,
-      stages: run.stages.map((stage, index) => ({
-        ...stage,
-        id: stage.id ?? `${stage.stageId}:${stage.modelId}:${index}`,
-        agentLabel: stage.agentLabel ?? getAgentLabel(stage.modelId),
-      })),
-      final: run.final
-        ? {
-            ...run.final,
-            id: run.final.id ?? 'final',
-            agentLabel: run.final.agentLabel ?? getAgentLabel(run.final.modelId),
-          }
-        : undefined,
-    })) ?? []
-
-  const normalizedWorkflows = mergeTemplates(
-    state.workflows && state.workflows.length > 0
-      ? state.workflows.map((workflow) => ({
-          ...workflow,
-          description: workflow.description ?? undefined,
-          stages: normalizeStages(workflow.stages),
-        }))
-      : [
-          {
-            id: DEFAULT_WORKFLOW_ID,
-            name: 'Default pipeline',
-            description: 'Baseline multi-stage workflow for structured solutions.',
-            stages: normalizedStages.length > 0 ? normalizedStages : cloneDefaultStages(),
-          },
-        ],
-  )
-  const normalizedSelectedWorkflowId =
-    state.selectedWorkflowId ?? normalizedWorkflows[0]?.id ?? DEFAULT_WORKFLOW_ID
-  const selectedWorkflowStages =
-    normalizedWorkflows.find((workflow) => workflow.id === normalizedSelectedWorkflowId)?.stages ??
-    normalizedStages
-
-  return {
-    ...state,
-    agentModelIds:
-      state.agentModelIds && state.agentModelIds.length > 0
-        ? state.agentModelIds
-        : DEFAULT_AGENT_MODEL_IDS,
-    synthesisModelId: state.synthesisModelId ?? DEFAULT_SYNTHESIS_MODEL_ID,
-    reviewModelId: state.reviewModelId ?? state.finalModelId ?? DEFAULT_REVIEW_MODEL_ID,
-    retryEnabled: state.retryEnabled ?? true,
-    retryThreshold: state.retryThreshold ?? DEFAULT_RETRY_THRESHOLD,
-    theme: state.theme ?? 'light',
-    runs: normalizedRuns,
-    workflows: normalizedWorkflows,
-    selectedWorkflowId: normalizedSelectedWorkflowId,
-    stages: selectedWorkflowStages.length > 0 ? selectedWorkflowStages : cloneDefaultStages(),
-  }
-}
-
 export default function App() {
-  const stored = normalizeStoredState(loadStoredState())
-  const initialWorkflows = mergeTemplates(stored?.workflows ?? TEMPLATE_WORKFLOWS)
+  const { stored, persistState } = useLocalStorageState({
+    templateWorkflows: TEMPLATE_WORKFLOWS,
+    defaultWorkflowId: DEFAULT_WORKFLOW_ID,
+    getAgentLabel,
+    defaultRetryThreshold: DEFAULT_RETRY_THRESHOLD,
+  })
+  const initialWorkflows = mergeTemplates(TEMPLATE_WORKFLOWS, stored?.workflows ?? [])
+  const initialSelectedRunId = stored?.selectedRunId ?? stored?.runs?.[0]?.id
+  const initialSelectedRun = stored?.runs?.find((run) => run.id === initialSelectedRunId)
   const initialWorkflowId =
-    stored?.selectedWorkflowId ?? initialWorkflows[0]?.id ?? DEFAULT_WORKFLOW_ID
+    initialSelectedRun?.workflowId ??
+    stored?.selectedWorkflowId ??
+    initialWorkflows[0]?.id ??
+    DEFAULT_WORKFLOW_ID
   const initialStages =
+    initialSelectedRun?.stagesConfig ??
     initialWorkflows.find((workflow) => workflow.id === initialWorkflowId)?.stages ??
     stored?.stages ??
     cloneDefaultStages()
   const [apiKey, setApiKey] = useState(stored?.apiKey ?? '')
   const [baseUrl, setBaseUrl] = useState(stored?.baseUrl ?? DEFAULT_BASE_URL)
-  const [problem, setProblem] = useState(stored?.problem ?? '')
-  const [stages, setStages] = useState<StageConfig[]>(initialStages.map((stage) => ({ ...stage })))
-  const [workflows, setWorkflows] = useState<WorkflowConfig[]>(initialWorkflows)
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState(initialWorkflowId)
+  const [problem, setProblem] = useState(initialSelectedRun?.problem ?? stored?.problem ?? '')
   const [agentModelIds, setAgentModelIds] = useState<string[]>(
-    stored?.agentModelIds ?? DEFAULT_AGENT_MODEL_IDS,
+    initialSelectedRun?.agentModelIds ?? stored?.agentModelIds ?? DEFAULT_AGENT_MODEL_IDS,
   )
   const [synthesisModelId, setSynthesisModelId] = useState(
-    stored?.synthesisModelId ?? DEFAULT_SYNTHESIS_MODEL_ID,
+    initialSelectedRun?.synthesisModelId ?? stored?.synthesisModelId ?? DEFAULT_SYNTHESIS_MODEL_ID,
   )
   const [reviewModelId, setReviewModelId] = useState(
-    stored?.reviewModelId ?? DEFAULT_REVIEW_MODEL_ID,
+    initialSelectedRun?.reviewModelId ?? stored?.reviewModelId ?? DEFAULT_REVIEW_MODEL_ID,
   )
   const [retryEnabled, setRetryEnabled] = useState(stored?.retryEnabled ?? true)
   const [retryThreshold, setRetryThreshold] = useState(
     stored?.retryThreshold ?? DEFAULT_RETRY_THRESHOLD,
   )
-  const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
-  const [runElapsedMs, setRunElapsedMs] = useState(0)
-  const [selectedResult, setSelectedResult] = useState<StageResult | null>(null)
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [sheetViewAsText, setSheetViewAsText] = useState(false)
   const [historySheetOpen, setHistorySheetOpen] = useState(false)
-  const [workflowSheetOpen, setWorkflowSheetOpen] = useState(false)
   const [isEditingApiKey, setIsEditingApiKey] = useState(() => !stored?.apiKey?.trim())
   const [theme, setTheme] = useState<'light' | 'dark'>(stored?.theme ?? 'light')
   const [newModelId, setNewModelId] = useState('')
   const [newPresetId, setNewPresetId] = useState(MODEL_OPTIONS[0]?.id ?? 'custom')
-  const [runs, setRuns] = useState<PipelineRun[]>(stored?.runs ?? [])
-  const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
-    stored?.selectedRunId ?? stored?.runs?.[0]?.id,
-  )
-  const [isRunning, setIsRunning] = useState(false)
-  const [workflowName, setWorkflowName] = useState('')
-  const [workflowDescription, setWorkflowDescription] = useState('')
-  const [workflowStages, setWorkflowStages] = useState<
-    Array<{ id: string; name: string; prompt: string; kind: StageKind }>
-  >([])
 
-  const selectedRun = useMemo(
-    () => runs.find((run) => run.id === selectedRunId) ?? runs[0],
-    [runs, selectedRunId],
-  )
-  const selectedWorkflow = useMemo(
-    () => workflows.find((workflow) => workflow.id === selectedWorkflowId),
-    [selectedWorkflowId, workflows],
-  )
+  const {
+    stages,
+    setStages,
+    workflows,
+    setWorkflows,
+    selectedWorkflowId,
+    setSelectedWorkflowId,
+    selectedWorkflow,
+    workflowSheetOpen,
+    setWorkflowSheetOpen,
+    workflowName,
+    setWorkflowName,
+    workflowDescription,
+    setWorkflowDescription,
+    workflowStages,
+    selectWorkflow,
+    applyWorkflowFromRun,
+    syncStagesToWorkflow,
+    resetWorkflowDraft,
+    handleWorkflowStageUpdate,
+    handleWorkflowStageAdd,
+    handleWorkflowStageRemove,
+    handleSaveWorkflow: handleSaveWorkflowState,
+  } = useWorkflowState({
+    initialStages,
+    initialWorkflows,
+    initialSelectedWorkflowId: initialWorkflowId,
+  })
+
+  const {
+    runs,
+    selectedRunId,
+    setSelectedRunId,
+    viewedRun,
+    selectedResult,
+    sheetOpen,
+    setSheetOpen,
+    sheetViewAsText,
+    setSheetViewAsText,
+    isRunning,
+    runStartedAt,
+    runElapsedMs,
+    handleRun,
+    handleViewResult,
+    clearHistory,
+    clearSelectedResult,
+    resetRunState,
+  } = usePipelineRunner({
+    apiKey,
+    baseUrl,
+    stages,
+    agentModelIds,
+    synthesisModelId,
+    reviewModelId,
+    problem,
+    retryEnabled,
+    retryThreshold,
+    selectedWorkflowId,
+    getAgentLabel,
+    initialRuns: stored?.runs ?? [],
+    initialSelectedRunId,
+    onApplyRun: (run) => {
+      setProblem(run.problem)
+      setAgentModelIds(run.agentModelIds)
+      setSynthesisModelId(run.synthesisModelId)
+      setReviewModelId(run.reviewModelId)
+      applyWorkflowFromRun(run.workflowId, run.stagesConfig)
+    },
+  })
   const hasApiKey = Boolean(apiKey.trim())
   const isViewingComplete =
-    selectedRun?.final?.status === 'complete' ||
-    (selectedRun?.stages.length
-      ? selectedRun.stages.every((stage) => stage.status === 'complete')
+    viewedRun?.final?.status === 'complete' ||
+    (viewedRun?.stages.length
+      ? viewedRun.stages.every((stage) => stage.status === 'complete')
       : false)
 
   useEffect(() => {
-    saveStoredState({
+    persistState({
       apiKey,
       baseUrl,
       problem,
@@ -389,14 +265,15 @@ export default function App() {
       retryThreshold,
       theme,
       runs,
-      selectedRunId: selectedRun?.id,
+      selectedRunId,
     })
   }, [
     apiKey,
     baseUrl,
     problem,
+    persistState,
     runs,
-    selectedRun?.id,
+    selectedRunId,
     stages,
     workflows,
     selectedWorkflowId,
@@ -409,33 +286,13 @@ export default function App() {
   ])
 
   useEffect(() => {
-    if (!selectedWorkflowId) return
-    setWorkflows((prev) =>
-      prev.map((workflow) =>
-        workflow.id === selectedWorkflowId ? { ...workflow, stages } : workflow,
-      ),
-    )
-  }, [selectedWorkflowId, stages])
+    syncStagesToWorkflow(stages)
+  }, [stages, syncStagesToWorkflow])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [theme])
-
-  useEffect(() => {
-    if (!isRunning || runStartedAt == null) return
-    const interval = window.setInterval(() => {
-      setRunElapsedMs(Date.now() - runStartedAt)
-    }, 1000)
-    return () => window.clearInterval(interval)
-  }, [isRunning, runStartedAt])
-
-  const formatElapsed = (durationMs: number) => {
-    const totalSeconds = Math.max(0, Math.floor(durationMs / 1000))
-    const minutes = Math.floor(totalSeconds / 60)
-    const seconds = totalSeconds % 60
-    return `${minutes}m ${seconds}s`
-  }
 
   const enabledStages = stages.filter((stage) => stage.enabled)
   const synthesisStages = enabledStages.filter((stage) => isSynthesisStage(stage))
@@ -459,7 +316,13 @@ export default function App() {
   }
 
   const handleAgentUpdate = (index: number, value: string) => {
-    setAgentModelIds((prev) => prev.map((item, idx) => (idx === index ? value : item)))
+    setAgentModelIds((prev) => {
+      if (prev.some((item, idx) => idx !== index && item === value)) {
+        toast.error('That model is already in the pool.')
+        return prev
+      }
+      return prev.map((item, idx) => (idx === index ? value : item))
+    })
   }
 
   const handleAgentRemove = (index: number) => {
@@ -483,91 +346,25 @@ export default function App() {
   }
 
   const handleWorkflowSelect = (workflowId: string) => {
-    const workflow = workflows.find((item) => item.id === workflowId)
-    if (!workflow) return
-    setSelectedWorkflowId(workflowId)
-    setStages(cloneStages(workflow.stages))
-  }
-
-  const createEmptyWorkflowStage = (kind: StageKind = 'agent') => ({
-    id: createStageId(),
-    name: '',
-    prompt: '',
-    kind,
-  })
-
-  const resetWorkflowDraft = () => {
-    setWorkflowName('')
-    setWorkflowDescription('')
-    setWorkflowStages([createEmptyWorkflowStage('agent')])
-  }
-
-  const handleWorkflowStageUpdate = (
-    stageId: string,
-    updates: Partial<{ name: string; prompt: string; kind: StageKind }>,
-  ) => {
-    setWorkflowStages((prev) =>
-      prev.map((stage) => (stage.id === stageId ? { ...stage, ...updates } : stage)),
-    )
-  }
-
-  const handleWorkflowStageAdd = () => {
-    setWorkflowStages((prev) => [...prev, createEmptyWorkflowStage('agent')])
-  }
-
-  const handleWorkflowStageRemove = (stageId: string) => {
-    setWorkflowStages((prev) => prev.filter((stage) => stage.id !== stageId))
+    selectWorkflow(workflowId)
+    setSelectedRunId(undefined)
+    resetRunState()
   }
 
   const handleSaveWorkflow = () => {
-    const trimmedName = workflowName.trim()
-    if (!trimmedName) {
-      toast.error('Add a workflow name before saving.')
-      return
-    }
-    if (workflowStages.length === 0) {
-      toast.error('Add at least one stage to save this workflow.')
-      return
-    }
-
-    const missingStage = workflowStages.find((stage) => !stage.name.trim() || !stage.prompt.trim())
-    if (missingStage) {
+    const result = handleSaveWorkflowState()
+    if (!result.ok) {
+      if (result.reason === 'missing-name') {
+        toast.error('Add a workflow name before saving.')
+        return
+      }
+      if (result.reason === 'missing-stages') {
+        toast.error('Add at least one stage to save this workflow.')
+        return
+      }
       toast.error('Each stage needs a name and prompt before saving.')
       return
     }
-
-    const usedIds = new Set<string>()
-    const stagesToSave: StageConfig[] = workflowStages.map((stage) => {
-      const baseId = slugifyStageId(stage.name) || createStageId()
-      let stageId = baseId
-      let suffix = 2
-      while (usedIds.has(stageId)) {
-        stageId = `${baseId}-${suffix}`
-        suffix += 1
-      }
-      usedIds.add(stageId)
-      return {
-        id: stageId,
-        label: stage.name.trim(),
-        enabled: true,
-        systemPrompt: stage.prompt.trim(),
-        temperature: stage.kind === 'review' ? 0.2 : stage.kind === 'synthesis' ? 0.35 : 0.4,
-        kind: stage.kind,
-      }
-    })
-
-    const newWorkflow: WorkflowConfig = {
-      id: createWorkflowId(),
-      name: trimmedName,
-      description: workflowDescription.trim() || undefined,
-      stages: stagesToSave,
-    }
-
-    setWorkflows((prev) => [newWorkflow, ...prev])
-    setSelectedWorkflowId(newWorkflow.id)
-    setStages(cloneStages(stagesToSave))
-    setWorkflowSheetOpen(false)
-    resetWorkflowDraft()
     toast.success('Workflow saved')
   }
 
@@ -599,16 +396,6 @@ export default function App() {
     setNewPresetId(MODEL_OPTIONS[0]?.id ?? 'custom')
   }
 
-  const handleClearHistory = () => {
-    setRuns([])
-    setSelectedRunId(undefined)
-  }
-
-  const handleViewResult = (result: StageResult) => {
-    setSelectedResult(result)
-    setSheetOpen(true)
-  }
-
   const handleClearData = () => {
     clearStoredState()
     setApiKey('')
@@ -616,281 +403,22 @@ export default function App() {
     setProblem('')
     const defaultStages = cloneDefaultStages()
     setStages(defaultStages)
-    setWorkflows(mergeTemplates(TEMPLATE_WORKFLOWS))
+    setWorkflows(mergeTemplates(TEMPLATE_WORKFLOWS, []))
     setSelectedWorkflowId(DEFAULT_WORKFLOW_ID)
     setAgentModelIds(DEFAULT_AGENT_MODEL_IDS)
     setSynthesisModelId(DEFAULT_SYNTHESIS_MODEL_ID)
     setReviewModelId(DEFAULT_REVIEW_MODEL_ID)
     setRetryEnabled(true)
     setRetryThreshold(DEFAULT_RETRY_THRESHOLD)
-    setRuns([])
-    setSelectedRunId(undefined)
+    clearHistory()
     setTheme('light')
     setNewModelId('')
     setNewPresetId(MODEL_OPTIONS[0]?.id ?? 'custom')
   }
 
-  const handleRun = async () => {
+  const handleRunClick = () => {
     if (!canRun || isRunning) return
-
-    const requestWithRetries = async (params: Parameters<typeof requestStage>[0]) => {
-      const attempts = retryEnabled ? Math.max(1, retryThreshold) : 1
-      let lastError: unknown
-
-      for (let attempt = 1; attempt <= attempts; attempt += 1) {
-        try {
-          return await requestStage(params)
-        } catch (error) {
-          lastError = error
-        }
-      }
-
-      throw lastError
-    }
-
-    const runId = createRunId()
-    const createdAt = new Date().toISOString()
-    const runStages: StageResult[] = enabledStages.flatMap((stage) => {
-      if (isReviewStage(stage)) return []
-      if (isAgentStage(stage)) {
-        return agentModelIds.map((modelId) => ({
-          id: `${stage.id}:${modelId}`,
-          stageId: stage.id,
-          stageLabel: stage.label,
-          modelId,
-          agentLabel: getAgentLabel(modelId),
-          systemPrompt: stage.systemPrompt,
-          status: 'pending' as const,
-        }))
-      }
-      if (isSynthesisStage(stage)) {
-        return [
-          {
-            id: `${stage.id}:${synthesisModelId}`,
-            stageId: stage.id,
-            stageLabel: stage.label,
-            modelId: synthesisModelId,
-            agentLabel: getAgentLabel(synthesisModelId),
-            systemPrompt: stage.systemPrompt,
-            status: 'pending' as const,
-          },
-        ]
-      }
-      return []
-    })
-
-    const newRun: PipelineRun = {
-      id: runId,
-      problem: problem.trim(),
-      createdAt,
-      stages: runStages,
-      final: reviewStage
-        ? {
-            id: 'final',
-            label: 'Final review',
-            modelId: reviewModelId,
-            agentLabel: getAgentLabel(reviewModelId),
-            systemPrompt: reviewStage.systemPrompt,
-            status: 'pending',
-          }
-        : undefined,
-    }
-
-    setRuns((prev) => [newRun, ...prev].slice(0, MAX_RUNS))
-    setSelectedRunId(runId)
-    setIsRunning(true)
-    setRunStartedAt(Date.now())
-    setRunElapsedMs(0)
-
-    const priorOutputs: string[] = []
-    let errorOccurred = false
-
-    const executionStages = enabledStages.filter((stage) => !isReviewStage(stage))
-
-    for (const stageConfig of executionStages) {
-      if (isAgentStage(stageConfig)) {
-        const stageEntries = agentModelIds.map((modelId) => ({
-          modelId,
-          stageResultId: `${stageConfig.id}:${modelId}`,
-          startTime: new Date(),
-        }))
-
-        for (const entry of stageEntries) {
-          setRuns((prev) =>
-            updateRunStages(prev, runId, entry.stageResultId, (stage) => ({
-              ...stage,
-              status: 'running',
-              startedAt: entry.startTime.toISOString(),
-            })),
-          )
-        }
-
-        const stageOutputs: string[] = []
-
-        const requests = stageEntries.map((entry) =>
-          requestWithRetries({
-            apiKey,
-            baseUrl,
-            stage: stageConfig,
-            modelId: entry.modelId,
-            problem: problem.trim(),
-            priorOutputs,
-          })
-            .then(({ content, request, responseMeta }) => {
-              const finishedAt = new Date()
-              const durationMs = finishedAt.getTime() - entry.startTime.getTime()
-              setRuns((prev) =>
-                updateRunStages(prev, runId, entry.stageResultId, (stage) => ({
-                  ...stage,
-                  status: 'complete',
-                  completedAt: finishedAt.toISOString(),
-                  durationMs,
-                  output: content,
-                  request,
-                  response: responseMeta,
-                })),
-              )
-              stageOutputs.push(
-                `### ${stageConfig.label} (${getAgentLabel(entry.modelId)})\\n${content}`,
-              )
-            })
-            .catch((error) => {
-              const finishedAt = new Date()
-              const durationMs = finishedAt.getTime() - entry.startTime.getTime()
-              const message = error instanceof Error ? error.message : 'Request failed'
-              setRuns((prev) =>
-                updateRunStages(prev, runId, entry.stageResultId, (stage) => ({
-                  ...stage,
-                  status: 'error',
-                  completedAt: finishedAt.toISOString(),
-                  durationMs,
-                  error: message,
-                })),
-              )
-              errorOccurred = true
-            }),
-        )
-
-        await Promise.allSettled(requests)
-
-        if (errorOccurred) {
-          break
-        }
-
-        priorOutputs.push(...stageOutputs)
-        continue
-      }
-
-      if (isSynthesisStage(stageConfig)) {
-        const stageResultId = `${stageConfig.id}:${synthesisModelId}`
-        const startTime = new Date()
-        setRuns((prev) =>
-          updateRunStages(prev, runId, stageResultId, (stage) => ({
-            ...stage,
-            status: 'running',
-            startedAt: startTime.toISOString(),
-          })),
-        )
-
-        try {
-          const { content, request, responseMeta } = await requestWithRetries({
-            apiKey,
-            baseUrl,
-            stage: stageConfig,
-            modelId: synthesisModelId,
-            problem: problem.trim(),
-            priorOutputs,
-          })
-
-          const finishedAt = new Date()
-          const durationMs = finishedAt.getTime() - startTime.getTime()
-
-          setRuns((prev) =>
-            updateRunStages(prev, runId, stageResultId, (stage) => ({
-              ...stage,
-              status: 'complete',
-              completedAt: finishedAt.toISOString(),
-              durationMs,
-              output: content,
-              request,
-              response: responseMeta,
-            })),
-          )
-
-          priorOutputs.push(`### ${stageConfig.label}\\n${content}`)
-        } catch (error) {
-          const finishedAt = new Date()
-          const durationMs = finishedAt.getTime() - startTime.getTime()
-          const message = error instanceof Error ? error.message : 'Request failed'
-
-          setRuns((prev) =>
-            updateRunStages(prev, runId, stageResultId, (stage) => ({
-              ...stage,
-              status: 'error',
-              completedAt: finishedAt.toISOString(),
-              durationMs,
-              error: message,
-            })),
-          )
-          errorOccurred = true
-          break
-        }
-      }
-    }
-
-    if (!errorOccurred && reviewStage && newRun.final) {
-      const startTime = new Date()
-      setRuns((prev) =>
-        updateRunFinal(prev, runId, (finalStage) => ({
-          ...finalStage,
-          status: 'running',
-          startedAt: startTime.toISOString(),
-        })),
-      )
-
-      try {
-        const { content, request, responseMeta } = await requestWithRetries({
-          apiKey,
-          baseUrl,
-          stage: reviewStage,
-          modelId: reviewModelId,
-          problem: problem.trim(),
-          priorOutputs,
-        })
-
-        const finishedAt = new Date()
-        const durationMs = finishedAt.getTime() - startTime.getTime()
-
-        setRuns((prev) =>
-          updateRunFinal(prev, runId, (finalStage) => ({
-            ...finalStage,
-            status: 'complete',
-            completedAt: finishedAt.toISOString(),
-            durationMs,
-            output: content,
-            request,
-            response: responseMeta,
-          })),
-        )
-      } catch (error) {
-        const finishedAt = new Date()
-        const durationMs = finishedAt.getTime() - startTime.getTime()
-        const message = error instanceof Error ? error.message : 'Request failed'
-
-        setRuns((prev) =>
-          updateRunFinal(prev, runId, (finalStage) => ({
-            ...finalStage,
-            status: 'error',
-            completedAt: finishedAt.toISOString(),
-            durationMs,
-            error: message,
-          })),
-        )
-      }
-    }
-
-    setIsRunning(false)
-    setRunStartedAt(null)
+    handleRun()
   }
 
   return (
@@ -954,7 +482,6 @@ export default function App() {
             </div>
           </div>
         </header>
-
         <ProblemInput
           value={problem}
           onChange={setProblem}
@@ -978,28 +505,50 @@ export default function App() {
               </span>
             </div>
             <div className="mt-4 grid gap-3">
-              {agentModelIds.map((modelId, index) => (
-                <div
-                  key={modelId}
-                  className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-zinc-700/60"
-                >
-                  <Input
-                    value={modelId}
-                    onChange={(event) => handleAgentUpdate(index, event.target.value)}
-                    aria-label={`Model ${index + 1}`}
-                    className="flex-1 bg-white/90 dark:bg-zinc-900"
-                    disabled={isRunning}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleAgentRemove(index)}
-                    className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 hover:border-slate-300 dark:border-zinc-700/60 dark:text-zinc-400 dark:hover:border-zinc-600"
-                    disabled={isRunning}
+              {agentModelIds.map((modelId, index) => {
+                const isKnownModel = MODEL_OPTIONS.some((option) => option.id === modelId)
+                return (
+                  <div
+                    // biome-ignore lint/suspicious/noArrayIndexKey: stable index needed for Radix Select state
+                    key={`agent-model-${index}`}
+                    className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 dark:border-zinc-700/60"
                   >
-                    Remove
-                  </button>
-                </div>
-              ))}
+                    <Select
+                      value={modelId}
+                      onValueChange={(value) => handleAgentUpdate(index, value)}
+                      disabled={isRunning}
+                    >
+                      <SelectTrigger
+                        className="flex-1 bg-white shadow-sm focus:ring-0 focus:ring-offset-0 dark:bg-zinc-900"
+                        aria-label={`Model ${index + 1}`}
+                      >
+                        <SelectValue placeholder="Select a model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MODEL_OPTIONS.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                        {!isKnownModel && (
+                          <SelectItem
+                            key="custom"
+                            value={modelId}
+                          >{`Custom: ${modelId}`}</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <button
+                      type="button"
+                      onClick={() => handleAgentRemove(index)}
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.05em] text-slate-500 hover:border-slate-300 dark:border-zinc-700/60 dark:text-zinc-400 dark:hover:border-zinc-600"
+                      disabled={isRunning}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )
+              })}
             </div>
             {needsAgentModels && agentModelIds.length === 0 && (
               <p className="mt-3 text-xs text-rose-600 dark:text-rose-400">
@@ -1148,7 +697,7 @@ export default function App() {
                   Reset
                 </Button>
                 <Button
-                  onClick={handleRun}
+                  onClick={handleRunClick}
                   disabled={!canRun || isRunning}
                   className="gap-2 bg-slate-900 text-white hover:bg-slate-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
                 >
@@ -1245,12 +794,10 @@ export default function App() {
               </h2>
             </div>
             {stages.map((stage) => {
-              const stageResults = selectedRun?.stages.filter(
-                (result) => result.stageId === stage.id,
-              )
+              const stageResults = viewedRun?.stages.filter((result) => result.stageId === stage.id)
               const status =
                 stage.kind === 'review'
-                  ? selectedRun?.final?.status
+                  ? viewedRun?.final?.status
                   : stageResults
                     ? getStageStatus(stageResults)
                     : undefined
@@ -1282,7 +829,7 @@ export default function App() {
                 </Button>
               </div>
             </div>
-            <ResultsPanel run={selectedRun} />
+            <ResultsPanel run={viewedRun ?? undefined} />
           </div>
         </div>
         <Sheet
@@ -1440,129 +987,24 @@ export default function App() {
             </div>
           </SheetContent>
         </Sheet>
-        <Sheet
+        <ResultDetailSheet
           open={sheetOpen}
           onOpenChange={(open) => {
             setSheetOpen(open)
             if (!open) {
-              setSelectedResult(null)
+              clearSelectedResult()
               setSheetViewAsText(false)
             }
           }}
-        >
-          <SheetContent>
-            {selectedResult && (
-              <div className="space-y-6">
-                <SheetHeader>
-                  <SheetTitle>
-                    {selectedResult.stageLabel} · {selectedResult.agentLabel}
-                  </SheetTitle>
-                  <SheetDescription className="font-mono text-sky-700 dark:text-sky-300">
-                    {selectedResult.modelId}
-                  </SheetDescription>
-                </SheetHeader>
-
-                <div className="grid gap-3 text-sm text-slate-600 dark:text-zinc-300 md:grid-cols-3">
-                  <div>
-                    <span className="font-semibold text-slate-800 dark:text-zinc-100">Cost</span>
-                    <div>
-                      {selectedResult.response?.cost != null
-                        ? `$${selectedResult.response.cost.toFixed(4)}`
-                        : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-800 dark:text-zinc-100">Tokens</span>
-                    <div>
-                      {selectedResult.response?.usage?.total_tokens != null
-                        ? new Intl.NumberFormat('en-US').format(
-                            selectedResult.response.usage.total_tokens,
-                          )
-                        : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-800 dark:text-zinc-100">
-                      Duration
-                    </span>
-                    <div>
-                      {selectedResult.durationMs != null
-                        ? `${(selectedResult.durationMs / 1000).toFixed(1)}s`
-                        : '—'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      if (selectedResult?.output) {
-                        navigator.clipboard.writeText(selectedResult.output)
-                        toast.success('Response copied')
-                      }
-                    }}
-                  >
-                    Copy Response
-                  </Button>
-                  <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-zinc-300">
-                    <span>{sheetViewAsText ? 'View as Markdown' : 'View as Text'}</span>
-                    <label className="sr-only" htmlFor="stage-view-toggle">
-                      Toggle response view
-                    </label>
-                    <Switch
-                      id="stage-view-toggle"
-                      checked={sheetViewAsText}
-                      onCheckedChange={setSheetViewAsText}
-                      aria-label="Toggle response view"
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 dark:border-zinc-800/60 dark:bg-zinc-900/60">
-                  {selectedResult.error ? (
-                    <p className="text-sm text-rose-600 dark:text-rose-400">
-                      {selectedResult.error}
-                    </p>
-                  ) : selectedResult.output ? (
-                    sheetViewAsText ? (
-                      <div className="whitespace-pre-wrap text-sm text-slate-800 dark:text-zinc-100">
-                        {selectedResult.output}
-                      </div>
-                    ) : (
-                      <Markdown
-                        content={selectedResult.output}
-                        className="text-sm text-slate-800 dark:text-zinc-100"
-                      />
-                    )
-                  ) : (
-                    <p className="text-sm text-slate-500 dark:text-zinc-400">No output yet.</p>
-                  )}
-                </div>
-
-                <div className="grid gap-4">
-                  <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/60">
-                    <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
-                      Request payload
-                    </summary>
-                    <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
-                      {JSON.stringify(selectedResult.request, null, 2)}
-                    </pre>
-                  </details>
-                  <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/60">
-                    <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
-                      Response metadata
-                    </summary>
-                    <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
-                      {JSON.stringify(selectedResult.response, null, 2)}
-                    </pre>
-                  </details>
-                </div>
-              </div>
-            )}
-          </SheetContent>
-        </Sheet>
+          result={selectedResult}
+          title={
+            selectedResult ? `${selectedResult.stageLabel} · ${selectedResult.agentLabel}` : ''
+          }
+          subtitle={selectedResult?.modelId}
+          viewAsText={sheetViewAsText}
+          onViewAsTextChange={setSheetViewAsText}
+          toggleId="stage-view-toggle"
+        />
         <Sheet open={historySheetOpen} onOpenChange={setHistorySheetOpen}>
           <SheetContent>
             <div className="space-y-6">
@@ -1574,18 +1016,18 @@ export default function App() {
               </SheetHeader>
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600 dark:text-zinc-300">
                 <span>All data is stored locally in the browser.</span>
-                <Button size="sm" variant="secondary" onClick={handleClearHistory}>
+                <Button size="sm" variant="secondary" onClick={clearHistory}>
                   Clear all
                 </Button>
               </div>
               <RunHistory
                 runs={runs}
-                selectedRunId={selectedRun?.id}
+                selectedRunId={selectedRunId}
                 onSelect={(runId) => {
                   setSelectedRunId(runId)
                   setHistorySheetOpen(false)
                 }}
-                onClear={handleClearHistory}
+                onClear={clearHistory}
                 showClear={false}
               />
             </div>

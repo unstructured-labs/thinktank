@@ -1,16 +1,9 @@
 import { Button } from '@thinktank/ui-library/components/button'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@thinktank/ui-library/components/sheet'
 import { toast } from '@thinktank/ui-library/components/sonner'
-import { Switch } from '@thinktank/ui-library/components/switch'
 import { useState } from 'react'
+import { formatCost, formatDuration, formatNumber } from '../lib/format'
 import type { PipelineRun, StageResult } from '../lib/types'
-import { Markdown } from './Markdown'
+import { ResultDetailSheet } from './ResultDetailSheet'
 
 const statusStyles: Record<NonNullable<StageResult['status']>, string> = {
   pending: 'border-slate-200 text-slate-500 dark:border-zinc-700/60 dark:text-zinc-300',
@@ -18,16 +11,6 @@ const statusStyles: Record<NonNullable<StageResult['status']>, string> = {
     'border-amber-300 text-amber-600 bg-amber-50 animate-pulse dark:border-amber-400 dark:text-amber-300 dark:bg-amber-950/40',
   complete: 'border-emerald-400 text-emerald-700 dark:border-emerald-400 dark:text-emerald-300',
   error: 'border-rose-300 text-rose-700 dark:border-rose-400 dark:text-rose-300',
-}
-
-const formatCost = (cost?: number | null) => (cost != null ? `$${cost.toFixed(4)}` : '—')
-
-const formatDuration = (durationMs?: number) =>
-  durationMs != null ? `${(durationMs / 1000).toFixed(1)}s` : '—'
-
-const formatNumber = (value?: number | null) => {
-  if (value == null) return '—'
-  return new Intl.NumberFormat('en-US').format(value)
 }
 
 const getTotalCost = (run: PipelineRun) => {
@@ -156,36 +139,13 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
                 <p className="text-sm text-slate-500 dark:text-zinc-400">No output yet.</p>
               )}
             </div>
-
-            <details className="mt-4 rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/60">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
-                Request + response metadata
-              </summary>
-              <div className="mt-3 grid gap-3 text-xs text-slate-600 dark:text-zinc-300">
-                <div>
-                  <div className="font-semibold text-slate-700 dark:text-zinc-200">
-                    Request payload
-                  </div>
-                  <pre className="mt-1 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
-                    {JSON.stringify(run.final.request, null, 2)}
-                  </pre>
-                </div>
-                <div>
-                  <div className="font-semibold text-slate-700 dark:text-zinc-200">
-                    Response metadata
-                  </div>
-                  <pre className="mt-1 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
-                    {JSON.stringify(run.final.response, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            </details>
           </div>
         ) : (
           <p className="mt-3 text-sm text-slate-500 dark:text-zinc-400">No output yet.</p>
         )}
       </details>
-      <Sheet
+
+      <ResultDetailSheet
         open={finalSheetOpen}
         onOpenChange={(open) => {
           setFinalSheetOpen(open)
@@ -193,102 +153,13 @@ export const ResultsPanel = ({ run }: ResultsPanelProps) => {
             setFinalViewAsText(false)
           }
         }}
-      >
-        <SheetContent>
-          {run.final && (
-            <div className="space-y-6">
-              <SheetHeader>
-                <SheetTitle>Final review • {run.final.agentLabel ?? run.final.modelId}</SheetTitle>
-                <SheetDescription className="font-mono text-sky-700 dark:text-sky-300">
-                  {run.final.modelId}
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="grid gap-3 text-sm text-slate-600 dark:text-zinc-300 md:grid-cols-3">
-                <div>
-                  <span className="font-semibold text-slate-800 dark:text-zinc-100">Cost</span>
-                  <div>{formatCost(run.final.response?.cost)}</div>
-                </div>
-                <div>
-                  <span className="font-semibold text-slate-800 dark:text-zinc-100">Tokens</span>
-                  <div>{formatNumber(run.final.response?.usage?.total_tokens ?? null)}</div>
-                </div>
-                <div>
-                  <span className="font-semibold text-slate-800 dark:text-zinc-100">Duration</span>
-                  <div>{formatDuration(run.final.durationMs)}</div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      if (run.final?.output) {
-                        navigator.clipboard.writeText(run.final.output)
-                        toast.success('Response copied')
-                      }
-                    }}
-                  >
-                    Copy Response
-                  </Button>
-                  <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-zinc-300">
-                    <span>{finalViewAsText ? 'View as Markdown' : 'View as Text'}</span>
-                    <label className="sr-only" htmlFor="final-view-toggle">
-                      Toggle response view
-                    </label>
-                    <Switch
-                      id="final-view-toggle"
-                      checked={finalViewAsText}
-                      onCheckedChange={setFinalViewAsText}
-                      aria-label="Toggle response view"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 dark:border-zinc-800/60 dark:bg-zinc-900/60">
-                {run.final.error ? (
-                  <p className="text-sm text-rose-600 dark:text-rose-400">{run.final.error}</p>
-                ) : run.final.output ? (
-                  finalViewAsText ? (
-                    <div className="whitespace-pre-wrap text-sm text-slate-800 dark:text-zinc-100">
-                      {run.final.output}
-                    </div>
-                  ) : (
-                    <Markdown
-                      content={run.final.output}
-                      className="text-sm text-slate-800 dark:text-zinc-100"
-                    />
-                  )
-                ) : (
-                  <p className="text-sm text-slate-500 dark:text-zinc-400">No output yet.</p>
-                )}
-              </div>
-
-              <div className="grid gap-4">
-                <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/60">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
-                    Request payload
-                  </summary>
-                  <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
-                    {JSON.stringify(run.final.request, null, 2)}
-                  </pre>
-                </details>
-                <details className="rounded-xl border border-slate-100 bg-white/80 px-4 py-3 dark:border-zinc-800/60 dark:bg-zinc-950/60">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-700 dark:text-zinc-200">
-                    Response metadata
-                  </summary>
-                  <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-950/5 p-3 text-[11px] text-slate-700 dark:bg-zinc-900/70 dark:text-zinc-200">
-                    {JSON.stringify(run.final.response, null, 2)}
-                  </pre>
-                </details>
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+        result={run.final ?? null}
+        title={`Final review • ${run.final?.agentLabel ?? run.final?.modelId ?? ''}`}
+        subtitle={run.final?.modelId}
+        viewAsText={finalViewAsText}
+        onViewAsTextChange={setFinalViewAsText}
+        toggleId="final-view-toggle"
+      />
     </div>
   )
 }

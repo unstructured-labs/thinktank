@@ -64,6 +64,11 @@ export type FinalResult = {
 
 export type PipelineRun = {
   id: string
+  workflowId: string
+  stagesConfig: StageConfig[]
+  agentModelIds: string[]
+  synthesisModelId: string
+  reviewModelId: string
   problem: string
   createdAt: string
   stages: StageResult[]
