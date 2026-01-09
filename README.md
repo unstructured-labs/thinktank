@@ -55,3 +55,7 @@ docker build -f apps/web-thinktank/Dockerfile -t thinktank-web .
 ## Templates
 
 Copy any `[template]` folder when bootstrapping a new app, package, or tooling project to preserve repo conventions.
+
+# License
+
+MIT
