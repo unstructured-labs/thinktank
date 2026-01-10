@@ -1078,7 +1078,7 @@ export default function App() {
                 rel="noreferrer"
                 className="font-semibold text-slate-600 hover:text-sky-600 dark:text-zinc-300 dark:hover:text-sky-400"
               >
-                Unstructured Labs
+                Priori Labs
               </a>
             </span>
             <span>·</span>
