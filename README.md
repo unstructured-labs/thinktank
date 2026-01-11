@@ -1,4 +1,4 @@
-# Thinktank Pipeline
+# LLM Thinktank
 
 A Bun-powered monorepo for the Thinktank pipeline UI and API, built for running multi-stage LLM workflows (planning, synthesis, and review) across multiple models.
 
